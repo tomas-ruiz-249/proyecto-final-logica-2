@@ -1,5 +1,6 @@
-import pycosat
+# import pycosat
 from typing import List
+from pysat.solvers import Minisat22
 
 from groundedPL.logUtils import LogUtils
 from groundedPL.tseitin import TseitinTransform
@@ -39,7 +40,12 @@ class LogicTester:
         formula_tseitin = self.tseitin.tseitin(formula_lp)
         to_numeric = ToNumeric(formula_tseitin)
         formula_numeros = to_numeric.to_numeric(formula_tseitin)
-        res = pycosat.solve(formula_numeros)
+        # res = pycosat.solve(formula_numeros)
+        with Minisat22(bootstrap_with=formula_numeros) as m:
+            if m.solve():
+                res = m.get_model()
+            else:
+                res = 'UNSAT'
         self.to_numeric = to_numeric
         return res
 
