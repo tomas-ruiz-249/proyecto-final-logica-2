@@ -37,7 +37,11 @@ class LogicTester:
         return sentence_lp
     
     def SATsolve(self, formula_lp:str) -> bool:
+        print('transformando a tseitin...')
+        print(len(formula_lp))
         formula_tseitin = self.tseitin.tseitin(formula_lp)
+        print(len(formula_tseitin))
+        print('resolviendo...')
         to_numeric = ToNumeric(formula_tseitin)
         formula_numeros = to_numeric.to_numeric(formula_tseitin)
         # res = pycosat.solve(formula_numeros)
