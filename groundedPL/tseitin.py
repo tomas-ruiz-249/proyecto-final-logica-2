@@ -1,3 +1,4 @@
+import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 from typing import List, Tuple
@@ -11,19 +12,39 @@ class TseitinTransform :
     '''
 
     def __init__(self) -> None:
-        self.conectivos_binarios = ['∧','∨','>','=']
+        self.conectivos_binarios = ['Y','O','>','=']
         self.latex_conectivos = [r'\wedge', r'\vee', r'\to', r'\leftrightarrow']
         self.atomos = list()
         self.atomos_tseitin = list()
         self.debug = False
+
+    def translate_from_nltk(self, A:str) -> str:
+        '''
+        Transforma una cadena de texto en notacion de nltk
+        a notacion de un solo caracter'''
+        conectivos_alternos = ['&', '|', '->', '<->', '∧', '∨', '→', '↔']
+        dict_conectivos =  {
+            '&': 'Y',
+            '|': 'O',
+            '->': '>',
+            '<->': '=',
+            '∧': 'Y',
+            '∨': 'O',
+            '→': '>',
+            '↔': '='
+        }
+        for conectivo in conectivos_alternos:
+            A = A.replace(conectivo, dict_conectivos[conectivo])
+        A = A.replace(' ', '')
+        return A
 
     def a_clausal(self, A:str) -> List[str]:
         # Subrutina de Tseitin para encontrar la FNC de
         # la formula en la pila
         # Input: A (cadena) de la forma
         #                   p=-q
-        #                   p=(q∧r)
-        #                   p=(q∨r)
+        #                   p=(qYr)
+        #                   p=(qOr)
         #                   p=(q>r)
         # Output: B (cadena), equivalente en FNC
         assert(len(A)==4 or len(A)==7), u"Fórmula incorrecta!"
@@ -34,23 +55,23 @@ class TseitinTransform :
             q = A[-1]
             if self.debug:
                 print('q', q)
-            B = "-"+p+"∨-"+q+"∧"+p+"∨"+q
-        elif "∧" in A:
+            B = "-"+p+"O-"+q+"Y"+p+"O"+q
+        elif "Y" in A:
             q = A[3]
             if self.debug:
                 print('q', q)
             r = A[5]
             if self.debug:
                 print('r', r)
-            B = q+"∨-"+p+"∧"+r+"∨-"+p+"∧-"+q+"∨-"+r+"∨"+p
-        elif "∨" in A:
+            B = q+"O-"+p+"Y"+r+"O-"+p+"Y-"+q+"O-"+r+"O"+p
+        elif "O" in A:
             q = A[3]
             if self.debug:
                 print('q', q)
             r = A[5]
             if self.debug:
                 print('r', r)
-            B = "-"+q+"∨"+p+"∧-"+r+"∨"+p+"∧"+q+"∨"+r+"∨-"+p
+            B = "-"+q+"O"+p+"Y-"+r+"O"+p+"Y"+q+"O"+r+"O-"+p
         elif ">" in A:
             q = A[3]
             if self.debug:
@@ -58,7 +79,7 @@ class TseitinTransform :
             r = A[5]
             if self.debug:
                 print('r', r)
-            B = q+"∨"+p+"∧-"+r+"∨"+p+"∧-"+q+"∨"+r+"∨-"+p
+            B = q+"O"+p+"Y-"+r+"O"+p+"Y-"+q+"O"+r+"O-"+p
         elif "=" in A:
             q = A[3]
             if self.debug:
@@ -66,11 +87,12 @@ class TseitinTransform :
             r = A[5]
             if self.debug:
                 print('r', r)
-            B = q+"∨"+"-"+r+"∨"+"-"+p+"∧"+"-"+q+"∨"+r+"∨"+"-"+p+"∧"+"-"+q+"∨"+"-"+r+"∨"+p+"∧"+q+"∨"+r+"∨"+p
+            B = q+"O"+"-"+r+"O"+"-"+p+"Y"+"-"+q+"O"+r+"O"+"-"+p+"Y"+"-"+q+"O"+"-"+r+"O"+p+"Y"+q+"O"+r+"O"+p
         else:
             raise Exception(f'Error enENC(): Fórmula incorrecta! ({A})')
-        B = B.split('∧')
-        B = [c.split('∨') for c in B]
+        B = B.split('Y')
+        B = [c.split('O') for c in B]
+        assert(np.all([len(x) > 0 for c in B for x in c])), f"Error en cláusula {A}"
         return B
 
     def tseitin(self, A:str) -> List[List[str]]:
@@ -80,6 +102,7 @@ class TseitinTransform :
         Output: B (cadena), Tseitin
         '''
         # Creamos letras proposicionales nuevas
+        A = self.translate_from_nltk(A)
         num_conectivos_binarios = sum([A.count(c) for c in self.conectivos_binarios])
         if self.debug:
             print('Número de conectivos binarios:', num_conectivos_binarios)
@@ -98,6 +121,7 @@ class TseitinTransform :
         cods_letras = [ord(x) for x in letrasp]
         m = max(cods_letras) + 256
         letrasp_tseitin = [chr(x) for x in range(m, m + num_conectivos_binarios + num_negaciones)]
+        assert(np.all([x not in self.conectivos_binarios for x in letrasp_tseitin])), f"Error en letras proposicionales ({letrasp_tseitin})"
         self.atomos_tseitin = letrasp_tseitin
         if self.debug:
             print('Número de letras Tseitin:', len(letrasp_tseitin))
@@ -109,10 +133,7 @@ class TseitinTransform :
         Pila = [] # Inicializamos pila
         i = -1 # Inicializamos contador de variables nuevas
         s = A[0] # Inicializamos símbolo de trabajo
-        if self.debug:
-            pbar = tqdm(total=len(A))
-        else:
-            pbar = tqdm(total=len(A), disable=True)
+        pbar = tqdm(total=len(A))
         while len(A) > 0: # Recorremos la cadena
             if self.debug:
                 print(A)
